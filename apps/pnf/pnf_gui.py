@@ -11,7 +11,16 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import os
 import sys
 import math
-from pnf_chart import PNFChart
+
+# 兼容作为包或脚本运行的导入逻辑
+try:
+    from .pnf_chart import PNFChart  # 当以包运行：python -m apps.pnf.pnf_gui
+except ImportError:
+    # 当以脚本运行：python apps\pnf\pnf_gui.py 或在apps\pnf目录下执行
+    _cur = os.path.dirname(os.path.abspath(__file__))
+    if _cur not in sys.path:
+        sys.path.append(_cur)
+    from pnf_chart import PNFChart
 
 class PNFChartApp:
     def __init__(self, root):
@@ -263,7 +272,8 @@ class PNFChartApp:
                 col_idx = mp['col']
                 price = mp['price']
                 symbol = mp['symbol']
-                color = 'green' if symbol == 'X' else 'red'
+                # 金融标准：上涨(X)用红色，下跌(O)用绿色
+                color = 'red' if symbol == 'X' else 'green'
                 artist = self.ax.text(col_idx, price, symbol, ha='center', va='center', color=color, fontsize=12)
                 self.mark_artists.append({'artist': artist, 'meta': mp})
             

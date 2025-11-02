@@ -1,61 +1,72 @@
-# PNF图表生成器
+# 股票分析工具集（PNF + 交易复盘）
 
-这是一个基于Python的桌面应用程序，用于生成股票的点数图（Point and Figure Chart，简称PNF图）。
+本仓库包含两大模块：
+- PNF 点数图（桌面 GUI）
+- 交易复盘（数据解析、FIFO撮合、报表与前端展示）
 
-## 功能特性
+## 模块一：PNF 点数图（GUI）
 
-- **直观的用户界面**：使用Tkinter构建，操作简便。
-- **Excel数据导入**：支持从`.xlsx`和`.xls`格式的Excel文件中导入股票数据。
-- **灵活的格值设置**：
-  - **预设格值**：根据股价中位数提供建议格值列表，方便快速选择。
-  - **固定格值**：允许用户手动输入自定义的格值。
-- **可配置的反转格数**：支持设置1点图、3点图等不同类型的PNF图。
-- **交互式图表**：生成的PNF图表支持鼠标悬停提示，显示详细的交易信息（日期、开盘价、收盘价、最高价、最低价等）。
-- **图表保存**：可以将生成的PNF图表保存为PNG图片。
-- **智能数据处理**：自动识别并处理Excel文件中的A1单元格作为图表标题，并包含列名验证和修复逻辑。
+- Tkinter 桌面界面，交互式生成点数图（1点图/3点图）。
+- 支持 `.xlsx`/`.xls` 数据输入，自动校正列名与数据类型。
+- 格值选择（预设/固定值）、反转格数设置、悬停显示标记元信息。
+- 支持保存 PNG 图片。
 
-## 技术栈
+运行：
+- 安装依赖：`pip install -r requirements.txt`
+- 启动 GUI：`python -m apps.pnf.pnf_gui`
 
-- **Python**
-- **Tkinter**：用于构建图形用户界面。
-- **Matplotlib**：用于绘制PNF图表。
-- **Pandas**：用于数据处理和分析。
-- **Numpy**：提供数值计算支持。
-- **Openpyxl / Xlrd**：用于读取Excel文件。
+## 模块二：交易复盘（报表 + 前端）
 
-## 如何运行
+- 从成交 Excel 解析字段，推断方向，统一数据格式。
+- 按股票进行 FIFO 撮合，按每次卖出统计已实现盈亏、持仓天数、收益率等。
+- 汇总个股与总体指标（胜率、最大回撤、平均持仓天数、平均收益率等）。
+- 生成 HTML 报表，并导出 JSON 以供前端仪表盘与个股详情使用。
+- 前端（纯静态页面，Chart.js 图表）：仪表盘 `index.html` 与个股详情 `stock.html`。
 
-1. **安装依赖**：
+生成数据与报表：
+- 执行：`python -m apps.trade_review.trade_review -i e:\codes\stock\PNF\成交报告单.xlsx`
+- 默认输出：`apps/trade_review/reports/trade_review.html`
+- JSON 输出：`apps/trade_review/reports/data/*.json`（包含 `overall.json`, `monthly.json`, `stocks.json`, `trades.json`, 以及 `data/stock/<code>.json`）
 
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-2. **运行应用程序**：
-
-   ```bash
-   python pnf_gui.py
-   ```
-
-## 使用说明
-
-1. **选择Excel文件**：点击“浏览...”按钮选择包含股票数据的Excel文件。
-2. **设置格值**：
-   - 选择“预设”模式，然后从下拉列表中选择一个建议格值。
-   - 选择“固定值”模式，然后手动输入一个格值。
-3. **设置反转格数**：调整反转所需的格子数量。
-4. **加载数据**：点击“加载数据”按钮，应用程序将读取并处理Excel文件中的数据。
-5. **生成图表**：点击“生成图表”按钮，PNF图表将在界面中显示。
-6. **保存图表**：点击“保存图表”按钮，将图表保存为PNG图片。
+本地预览前端：
+- 在 `apps/trade_review/reports` 目录启动本地服务器：
+  - Windows PowerShell：`python -m http.server 8000`
+- 打开浏览器访问：
+  - 仪表盘：`http://localhost:8000/index.html`
+  - 个股详情：`http://localhost:8000/stock.html?code=600871`（示例）
 
 ## 文件结构
 
 ```
-.gitignore
-LICENSE
-README.md
-pnf_chart.py        # PNF图表的核心逻辑，包括数据加载、格值计算和图表数据生成
-pnf_gui.py          # 图形用户界面（GUI）的实现
-requirements.txt    # 项目依赖库列表
-*.xls / *.xlsx      # 示例股票数据文件
+apps/
+  pnf/
+    __init__.py
+    pnf_chart.py      # PNF图表核心逻辑
+    pnf_gui.py        # PNF桌面GUI入口（python -m apps.pnf.pnf_gui）
+  trade_review/
+    __init__.py
+    trade_review.py   # 交易复盘脚本入口（python -m apps.trade_review.trade_review）
+    reports/
+      index.html      # 前端仪表盘
+      stock.html      # 个股详情页
+      assets/
+        style.css
+        index.js
+        stock.js
+      data/           # 由 trade_review.py 运行时生成的 JSON 输出
+
+requirements.txt      # 项目依赖库列表
+成交报告单.xlsx        # 交易复盘数据源（示例）
+stockXLS/              # PNF示例数据（.xls）
 ```
+
+## 依赖说明
+
+- pandas, matplotlib, numpy, openpyxl（读取 `.xlsx`）
+- xlrd（读取 `.xls`，PNF 模块用到；可选）
+
+## 备注
+
+- 如需自定义交易复盘输出路径：`python -m apps.trade_review.trade_review -i <excel> -o <html输出路径>`。
+- 前端页面完全静态，无需后端服务；只要生成了 `reports/data/*.json` 即可工作。
+- 若要扩展分类（如 GC/回购），可在后端导出 JSON 时新增字段维度，并在前端增加筛选与分组展示。
