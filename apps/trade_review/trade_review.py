@@ -487,6 +487,11 @@ def export_json_assets(trades_raw: pd.DataFrame, trades: pd.DataFrame, stock_sum
     months = []
     for month, g in t.groupby('month'):
         total = float(g['pnl'].sum())
+        # 近似成交额（闭合交易的买净支出+卖净收入）
+        turnover = float(g['buy_cost_net'].sum() + g['sell_proceeds_net'].sum())
+        win_rate = float((g['pnl'] > 0).mean() * 100.0)
+        active_stock_count = int(g['code'].nunique())
+        trade_count = int(len(g))
         stocks = []
         for code, sg in g.groupby('code'):
             stocks.append({
@@ -495,7 +500,15 @@ def export_json_assets(trades_raw: pd.DataFrame, trades: pd.DataFrame, stock_sum
                 'pnl': float(sg['pnl'].sum()),
                 'trade_count': int(len(sg))
             })
-        months.append({'month': month, 'total_pnl': total, 'stocks': stocks})
+        months.append({
+            'month': month,
+            'total_pnl': total,
+            'turnover': turnover,
+            'win_rate_%': win_rate,
+            'active_stock_count': active_stock_count,
+            'trade_count': trade_count,
+            'stocks': stocks
+        })
     months = sorted(months, key=lambda x: x['month'])
     monthly_path = os.path.join(data_dir, 'monthly.json')
     with open(monthly_path, 'w', encoding='utf-8') as f:
@@ -534,6 +547,46 @@ def export_json_assets(trades_raw: pd.DataFrame, trades: pd.DataFrame, stock_sum
         with open(os.path.join(stock_dir, f'{code_str}.json'), 'w', encoding='utf-8') as f:
             import json
             json.dump(payload, f, ensure_ascii=False, indent=2)
+
+    # Portfolio positions (quantity) by stock
+    try:
+      raw_pos = trades_raw.copy()
+      def qty_signed(row):
+          side = str(row.get('side', ''))
+          q = float(row.get('qty', 0) or 0)
+          if side == '买入':
+              return q
+          elif side == '卖出':
+              return -q
+          else:
+              return 0.0
+      raw_pos['qty_signed'] = raw_pos.apply(qty_signed, axis=1)
+      pos = raw_pos.groupby('code', as_index=False).agg({ 'qty_signed': 'sum', 'name': 'first' })
+      pos = pos.rename(columns={'qty_signed': 'position_qty'})
+      pos_records = [ { 'code': str(r['code']), 'name': r['name'], 'position_qty': float(r['position_qty']) } for _, r in pos.iterrows() if float(r['position_qty']) > 1e-9 ]
+      with open(os.path.join(data_dir, 'positions.json'), 'w', encoding='utf-8') as f:
+          import json
+          json.dump(pos_records, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+      # Positions export is optional
+      pass
+
+    # Daily net position timeseries (cumulative)
+    try:
+      raw_ts = trades_raw.copy()
+      raw_ts['date_str'] = raw_ts['date'].astype(str)
+      raw_ts['qty_signed'] = raw_ts.apply(lambda r: (float(r.get('qty', 0) or 0)) * (1 if str(r.get('side',''))=='买入' else (-1 if str(r.get('side',''))=='卖出' else 0)), axis=1)
+      daily = raw_ts.groupby('date_str', as_index=False)['qty_signed'].sum().sort_values('date_str')
+      net = 0.0
+      ts_records = []
+      for _, r in daily.iterrows():
+          net += float(r['qty_signed'])
+          ts_records.append({ 'date': str(r['date_str']), 'net_qty_cum': net })
+      with open(os.path.join(data_dir, 'positions_timeseries.json'), 'w', encoding='utf-8') as f:
+          import json
+          json.dump(ts_records, f, ensure_ascii=False, indent=2)
+    except Exception:
+      pass
 
 def run_once(input_path: str, output_path: str):
     trades_raw = load_trade_excel(input_path)

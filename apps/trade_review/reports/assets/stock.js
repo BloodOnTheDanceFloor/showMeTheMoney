@@ -14,6 +14,12 @@ function getCssVar(name) {
   return (v || '').trim() || undefined;
 }
 
+// Register zoom/pan plugin if available
+try {
+  const zoomPlugin = (window['chartjs-plugin-zoom'] && window['chartjs-plugin-zoom'].default) || window['ChartZoom'];
+  if (zoomPlugin) { Chart.register(zoomPlugin); }
+} catch (e) { console.warn('zoom plugin not available', e); }
+
 function applyTheme(theme) {
   const t = theme || 'dark';
   document.documentElement.setAttribute('data-theme', t);
@@ -23,6 +29,23 @@ function applyTheme(theme) {
 function setupThemeSelector(onChange) {
   // 主题选择器已移除，默认使用暗色主题
   return;
+}
+
+function setupFontSizeControl() {
+  const el = document.getElementById('fontSize');
+  const txt = document.getElementById('fontSizeVal');
+  if (!el) return;
+  const saved = Number(localStorage.getItem('font-scale') || '1');
+  const clamp = (v) => Math.min(1.5, Math.max(0.85, v));
+  const setScale = (v) => {
+    const s = clamp(Number(v) || 1);
+    document.documentElement.style.setProperty('--font-scale', s);
+    try { localStorage.setItem('font-scale', String(s)); } catch (e) {}
+    if (txt) txt.textContent = `${(s*100).toFixed(0)}%`;
+  };
+  el.value = String(saved);
+  setScale(saved);
+  el.addEventListener('input', () => setScale(el.value));
 }
 
 function fmtPnl(p) {
@@ -53,15 +76,19 @@ function renderEquityChart(trades) {
   const data = trades.map(t => { cum += (t.pnl || 0); return cum; });
   const ctx = document.getElementById('stockEquityChart');
   if (window.__equityChart) { window.__equityChart.destroy(); }
-  const accent = getCssVar('--accent') || '#3b82f6';
+  const accent = getCssVar('--accent') || '#4FC3F7';
   const grid = getCssVar('--border') || '#1f2937';
   const text = getCssVar('--text') || '#e5e7eb';
+  const gctx = ctx.getContext('2d');
+  const grad = gctx.createLinearGradient(0, 0, 0, ctx.height);
+  grad.addColorStop(0, 'rgba(79, 195, 247, 0.35)');
+  grad.addColorStop(1, 'rgba(79, 195, 247, 0.05)');
   window.__equityChart = new Chart(ctx, {
     type: 'line',
-    data: { labels, datasets: [{ label: '累计盈亏（元）', data, borderColor: accent }] },
+    data: { labels, datasets: [{ label: '累计盈亏（元）', data, borderColor: accent, backgroundColor: grad, fill: true }] },
     options: {
       responsive: true,
-      plugins: { legend: { display: false } },
+      plugins: { legend: { display: false }, zoom: { zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }, pan: { enabled: true, mode: 'x' } } },
       scales: {
         x: { ticks: { color: text }, grid: { color: grid } },
         y: { ticks: { color: text }, grid: { color: grid } }
@@ -110,19 +137,26 @@ function renderTrades(trades) {
     if (window.__tradesChart) { window.__tradesChart.destroy(); }
     const labels = trades.map(t => t.sell_date);
     const data = trades.map(t => (Number(t.sell_proceeds_net ?? 0) - Number(t.buy_cost_net ?? 0) - Number(t.fees_total ?? 0)));
-    const up = getCssVar('--up') || 'rgba(239, 68, 68, 0.8)';
-    const down = getCssVar('--down') || 'rgba(34, 197, 94, 0.8)';
+    const up = getCssVar('--up') || 'rgba(255, 82, 82, 0.8)';
+    const down = getCssVar('--down') || 'rgba(0, 230, 118, 0.8)';
     const grid = getCssVar('--border') || '#1f2937';
     const text = getCssVar('--text') || '#e5e7eb';
+    const gctx = ctx.getContext('2d');
+    const gradUp = gctx.createLinearGradient(0, 0, 0, ctx.height);
+    gradUp.addColorStop(0, 'rgba(255, 82, 82, 0.85)');
+    gradUp.addColorStop(1, 'rgba(255, 82, 82, 0.20)');
+    const gradDown = gctx.createLinearGradient(0, 0, 0, ctx.height);
+    gradDown.addColorStop(0, 'rgba(0, 230, 118, 0.85)');
+    gradDown.addColorStop(1, 'rgba(0, 230, 118, 0.20)');
     window.__tradesChart = new Chart(ctx, {
       type: 'bar',
       data: {
         labels,
-        datasets: [{ label: '单笔盈亏（元）', data, backgroundColor: data.map(v => v >= 0 ? up : down) }]
+        datasets: [{ label: '单笔盈亏（元）', data, backgroundColor: data.map(v => v >= 0 ? gradUp : gradDown) }]
       },
       options: {
         responsive: true,
-        plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `盈亏：${ctx.parsed.y.toFixed(2)} 元` } } },
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `盈亏：${ctx.parsed.y.toFixed(2)} 元` } }, zoom: { zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }, pan: { enabled: true, mode: 'x' } } },
         scales: { x: { ticks: { color: text }, grid: { color: grid } }, y: { ticks: { color: text }, grid: { color: grid }, beginAtZero: true } }
       }
     });
@@ -239,6 +273,7 @@ async function init() {
   document.getElementById('stockTitle').textContent = `个股详情：${code}`;
   try {
     applyTheme();
+    setupFontSizeControl();
     const data = await fetchJSON(`data/stock/${encodeURIComponent(code)}.json`);
     document.getElementById('stockTitle').textContent = `个股详情：${data.code} ${data.name || ''}`;
     renderSummary(data.summary || {});

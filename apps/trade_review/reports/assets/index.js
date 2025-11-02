@@ -9,6 +9,12 @@ function getCssVar(name) {
   return (v || '').trim() || undefined;
 }
 
+// Register zoom/pan plugin if available
+try {
+  const zoomPlugin = (window['chartjs-plugin-zoom'] && window['chartjs-plugin-zoom'].default) || window['ChartZoom'];
+  if (zoomPlugin) { Chart.register(zoomPlugin); }
+} catch (e) { console.warn('zoom plugin not available', e); }
+
 function applyTheme(theme) {
   const t = theme || localStorage.getItem('theme') || 'classic';
   document.documentElement.setAttribute('data-theme', t);
@@ -26,6 +32,23 @@ function setupThemeSelector(onChange) {
   });
 }
 
+function setupFontSizeControl() {
+  const el = document.getElementById('fontSize');
+  const txt = document.getElementById('fontSizeVal');
+  if (!el) return;
+  const saved = Number(localStorage.getItem('font-scale') || '1');
+  const clamp = (v) => Math.min(1.5, Math.max(0.85, v));
+  const setScale = (v) => {
+    const s = clamp(Number(v) || 1);
+    document.documentElement.style.setProperty('--font-scale', s);
+    try { localStorage.setItem('font-scale', String(s)); } catch (e) {}
+    if (txt) txt.textContent = `${(s*100).toFixed(0)}%`;
+  };
+  el.value = String(saved);
+  setScale(saved);
+  el.addEventListener('input', () => setScale(el.value));
+}
+
 function fmtPnl(p) {
   const cls = p >= 0 ? 'pnl-pos' : 'pnl-neg';
   const v = (Math.round(p * 100) / 100).toLocaleString();
@@ -37,8 +60,17 @@ function renderMonthlyChart(months) {
   const data = months.map(m => m.total_pnl);
   const ctx = document.getElementById('monthlyChart');
   if (window.__monthlyChart) { window.__monthlyChart.destroy(); }
-  const up = getCssVar('--up') || 'rgba(220, 38, 38, 0.8)';
-  const down = getCssVar('--down') || 'rgba(22, 163, 74, 0.8)';
+  const up = getCssVar('--up') || 'rgba(255, 82, 82, 0.8)';
+  const down = getCssVar('--down') || 'rgba(0, 230, 118, 0.8)';
+  const gctx = ctx.getContext('2d');
+  const gradUp = gctx.createLinearGradient(0, 0, 0, ctx.height);
+  gradUp.addColorStop(0, 'rgba(255, 82, 82, 0.85)');
+  gradUp.addColorStop(1, 'rgba(255, 82, 82, 0.20)');
+  const gradDown = gctx.createLinearGradient(0, 0, 0, ctx.height);
+  gradDown.addColorStop(0, 'rgba(0, 230, 118, 0.85)');
+  gradDown.addColorStop(1, 'rgba(0, 230, 118, 0.20)');
+  const grid = getCssVar('--border') || '#1f2937';
+  const text = getCssVar('--text') || '#e5e7eb';
   window.__monthlyChart = new Chart(ctx, {
     type: 'bar',
     data: {
@@ -46,13 +78,24 @@ function renderMonthlyChart(months) {
       datasets: [{
         label: '当月累计盈亏',
         data,
-        backgroundColor: data.map(v => v >= 0 ? up : down)
+        backgroundColor: data.map(v => v >= 0 ? gradUp : gradDown)
       }]
     },
     options: {
       responsive: true,
-      scales: { y: { beginAtZero: true } },
-      plugins: { legend: { display: false } }
+      scales: { x: { ticks: { color: text }, grid: { color: grid } }, y: { beginAtZero: true, ticks: { color: text }, grid: { color: grid } } },
+      plugins: {
+        legend: { display: false },
+        zoom: { zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }, pan: { enabled: true, mode: 'x' } }
+      },
+      onClick: (evt, elements) => {
+        const points = window.__monthlyChart.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true);
+        if (points && points.length) {
+          const i = points[0].index;
+          const month = labels[i];
+          setSelectedMonth(month);
+        }
+      }
     }
   });
 }
@@ -146,13 +189,31 @@ function renderStocksTable(stocks, sortKey = 'total_pnl', sortDir = 'desc') {
 async function init() {
   try {
     applyTheme();
+    setupFontSizeControl();
     const months = await fetchJSON('data/monthly.json');
+    const trades = await fetchJSON('data/trades.json');
+    const positions = await fetchJSON('data/positions.json').catch(() => []);
+    const posTs = await fetchJSON('data/positions_timeseries.json').catch(() => []);
+    window.__months = months;
+    window.__tradesAll = trades;
     renderMonthlyChart(months);
     renderMonthsList(months);
-    setupThemeSelector(() => renderMonthlyChart(months));
+    setupThemeSelector(() => {
+      renderMonthlyChart(months);
+      renderDailyTimeline(window.__tradesAll, window.__selectedMonth);
+      renderPositionsDonut(positions);
+      renderPositionTrend(posTs);
+    });
+    // 默认选中最后一个月份
+    const defaultMonth = months.length ? months[months.length - 1].month : undefined;
+    setSelectedMonth(defaultMonth);
 
     const stocks = await fetchJSON('data/stocks.json');
     renderStocksTable(stocks, 'total_pnl', 'desc');
+
+    renderPositionsDonut(positions);
+    renderPositionTrend(posTs);
+    bindModalClose();
   } catch (e) {
     console.error(e);
     alert('加载数据失败，请确认已生成 data/*.json');
@@ -160,3 +221,155 @@ async function init() {
 }
 
 init();
+
+// ----- New components -----
+
+function setSelectedMonth(m) {
+  window.__selectedMonth = m;
+  if (m) {
+    renderTopSummary(m, window.__tradesAll);
+    renderDailyTimeline(window.__tradesAll, m);
+  }
+}
+
+function renderTopSummary(month, trades) {
+  const box = document.getElementById('topSummaryGrid');
+  if (!box) return;
+  const list = (trades || []).filter(t => (t.sell_date || t.sell_dt || '').slice(0, 7) === month);
+  const buyCost = list.reduce((a, t) => a + Number(t.buy_cost_net || 0), 0);
+  const sellIn = list.reduce((a, t) => a + Number(t.sell_proceeds_net || 0), 0);
+  const turnover = buyCost + sellIn; // 近似：当月累计成交额
+  const wins = list.filter(t => Number(t.pnl || 0) > 0).length;
+  const losses = list.filter(t => Number(t.pnl || 0) < 0).length;
+  const plRatio = losses > 0 ? (wins / losses) : wins; // 盈亏比例（笔数）
+  const activeStocks = new Set(list.map(t => t.code)).size;
+  box.innerHTML = `
+    <div class="k"><div class="t">当月交易总额</div><div class="v">${turnover.toFixed(2)}</div></div>
+    <div class="k"><div class="t">盈亏比例（笔数）</div><div class="v">${(plRatio || 0).toFixed(2)}</div></div>
+    <div class="k"><div class="t">活跃股票数量</div><div class="v">${activeStocks}</div></div>
+  `;
+}
+
+function renderDailyTimeline(trades, month) {
+  const ctx = document.getElementById('dailyTimeline');
+  if (!ctx) return;
+  if (window.__dailyChart) { window.__dailyChart.destroy(); }
+  const grid = getCssVar('--border') || '#1f2937';
+  const text = getCssVar('--text') || '#e5e7eb';
+  const up = getCssVar('--up') || 'rgba(255, 82, 82, 0.8)';
+  const down = getCssVar('--down') || 'rgba(0, 230, 118, 0.8)';
+  const gctx = ctx.getContext('2d');
+  const gradUp = gctx.createLinearGradient(0, 0, 0, ctx.height);
+  gradUp.addColorStop(0, 'rgba(255, 82, 82, 0.85)');
+  gradUp.addColorStop(1, 'rgba(255, 82, 82, 0.20)');
+  const gradDown = gctx.createLinearGradient(0, 0, 0, ctx.height);
+  gradDown.addColorStop(0, 'rgba(0, 230, 118, 0.85)');
+  gradDown.addColorStop(1, 'rgba(0, 230, 118, 0.20)');
+  const list = (trades || []).filter(t => (t.sell_date || t.sell_dt || '').slice(0, 7) === month);
+  const map = new Map();
+  list.forEach(t => {
+    const d = (t.sell_date || t.sell_dt || '').slice(0, 10);
+    const pnl = Number(t.pnl || 0);
+    map.set(d, (map.get(d) || 0) + pnl);
+  });
+  const labels = Array.from(map.keys()).sort((a, b) => a.localeCompare(b));
+  const data = labels.map(d => map.get(d));
+  window.__dailyChart = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: [{ label: '当日盈亏（元）', data, backgroundColor: data.map(v => v >= 0 ? gradUp : gradDown) }] },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        zoom: { zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }, pan: { enabled: true, mode: 'x' } }
+      },
+      scales: { x: { ticks: { color: text }, grid: { color: grid } }, y: { beginAtZero: true, ticks: { color: text }, grid: { color: grid } } },
+      onClick: (evt) => {
+        const points = window.__dailyChart.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true);
+        if (points && points.length) {
+          const i = points[0].index;
+          const day = labels[i];
+          showDayDetails(day, trades);
+        }
+      }
+    }
+  });
+}
+
+function renderPositionsDonut(positions) {
+  const ctx = document.getElementById('positionsDonut');
+  if (!ctx || !positions || !positions.length) return;
+  if (window.__posDonut) { window.__posDonut.destroy(); }
+  const labels = positions.map(p => `${p.code}${p.name ? ' '+p.name : ''}`);
+  const data = positions.map(p => Math.max(0, Number(p.position_qty || 0)));
+  const accent = getCssVar('--accent') || '#4FC3F7';
+  const grid = getCssVar('--border') || '#1f2937';
+  const text = getCssVar('--text') || '#e5e7eb';
+  const colors = labels.map((_, i) => `hsla(${(i*37)%360}, 70%, 60%, 0.75)`);
+  window.__posDonut = new Chart(ctx, {
+    type: 'doughnut',
+    data: { labels, datasets: [{ label: '持仓股数占比', data, backgroundColor: colors, borderColor: grid }] },
+    options: { responsive: true, plugins: { legend: { labels: { color: text } }, tooltip: { callbacks: { label: (c) => `${c.label}: ${c.parsed.toLocaleString()} 股` } }, zoom: { zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'xy' }, pan: { enabled: true, mode: 'xy' } } } }
+  });
+}
+
+function renderPositionTrend(ts) {
+  const ctx = document.getElementById('positionTrend');
+  if (!ctx || !ts || !ts.length) return;
+  if (window.__posTrend) { window.__posTrend.destroy(); }
+  const labels = ts.map(x => x.date);
+  const data = ts.map(x => Number(x.net_qty_cum || 0));
+  const gctx = ctx.getContext('2d');
+  const accent = getCssVar('--accent') || '#4FC3F7';
+  const grid = getCssVar('--border') || '#1f2937';
+  const text = getCssVar('--text') || '#e5e7eb';
+  const grad = gctx.createLinearGradient(0, 0, 0, ctx.height);
+  grad.addColorStop(0, 'rgba(79, 195, 247, 0.35)');
+  grad.addColorStop(1, 'rgba(79, 195, 247, 0.05)');
+  window.__posTrend = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets: [{ label: '净持仓股数（累计）', data, borderColor: accent, backgroundColor: grad, fill: true }] },
+    options: { responsive: true, plugins: { legend: { display: false }, zoom: { zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }, pan: { enabled: true, mode: 'x' } } }, scales: { x: { ticks: { color: text }, grid: { color: grid } }, y: { ticks: { color: text }, grid: { color: grid } } } }
+  });
+}
+
+function bindModalClose() {
+  const modal = document.getElementById('dayModal');
+  const btn = document.getElementById('dayModalClose');
+  if (btn && modal) {
+    btn.addEventListener('click', () => modal.classList.remove('show'));
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('show'); });
+  }
+}
+
+function showDayDetails(day, trades) {
+  const modal = document.getElementById('dayModal');
+  const body = document.getElementById('dayModalBody');
+  const title = document.getElementById('dayModalTitle');
+  if (!modal || !body || !title) return;
+  title.textContent = `当日交易详情：${day}`;
+  const list = (trades || []).filter(t => (t.sell_date || t.sell_dt || '').slice(0, 10) === day);
+  const rows = list.map(t => `
+    <tr>
+      <td>${t.sell_date || t.sell_dt}</td>
+      <td><a href="stock.html?code=${encodeURIComponent(t.code)}">${t.code}</a></td>
+      <td>${t.name || ''}</td>
+      <td>${t.qty}</td>
+      <td>${(t.avg_buy_price || 0).toFixed(4)}</td>
+      <td>${(t.avg_sell_price || 0).toFixed(4)}</td>
+      <td>${(t.buy_cost_net || 0).toFixed(2)}</td>
+      <td>${(t.sell_proceeds_net || 0).toFixed(2)}</td>
+      <td>${(t.fees_total || 0).toFixed(2)}</td>
+      <td>${(t.pnl || 0).toFixed(2)}</td>
+    </tr>
+  `).join('');
+  body.innerHTML = `
+    <table class="table">
+      <thead>
+        <tr><th>日期</th><th>代码</th><th>名称</th><th>数量</th><th>均买价</th><th>均卖价</th><th>买净支出</th><th>卖净收入</th><th>费用</th><th>盈亏</th></tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+  modal.classList.add('show');
+}

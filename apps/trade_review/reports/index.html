@@ -6,6 +6,7 @@
   <title>交易汇总仪表盘</title>
   <link rel="stylesheet" href="assets/style.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@latest"></script>
 </head>
 <body>
   <header class="header">
@@ -15,16 +16,36 @@
       <label class="sub" for="themeSelect">主题：</label>
       <select id="themeSelect" class="theme-select">
         <option value="classic">经典（红涨绿跌）</option>
-        <option value="dark">深色专业</option>
+        <option value="dark">深色专业（炭黑）</option>
+        <option value="deepblue">深灰蓝终端</option>
         <option value="bluegray">蓝灰商务</option>
       </select>
+      <label class="sub" for="fontSize">字体：</label>
+      <input id="fontSize" type="range" min="0.85" max="1.5" step="0.05" />
+      <span id="fontSizeVal" class="sub"></span>
     </div>
   </header>
 
   <main class="container">
+    <section class="card" id="topSummary">
+      <h2>当月概览</h2>
+      <div id="topSummaryGrid" class="summary"></div>
+    </section>
+
     <section class="card">
       <h2>每月盈亏</h2>
       <canvas id="monthlyChart" height="120"></canvas>
+    </section>
+
+    <section class="grid2">
+      <section class="card">
+        <h2>交易记录时间轴（按日分组）</h2>
+        <canvas id="dailyTimeline" height="120"></canvas>
+      </section>
+      <section class="card">
+        <h2>持仓股票分布环形图</h2>
+        <canvas id="positionsDonut" height="120"></canvas>
+      </section>
     </section>
 
     <section class="card">
@@ -35,12 +56,23 @@
     <section class="card">
       <h2>个股交易汇总</h2>
       <div id="stocksTable"></div>
+      <h2 style="margin-top:16px">股票持仓变化趋势折线图</h2>
+      <canvas id="positionTrend" height="120"></canvas>
     </section>
   </main>
 
   <footer class="footer">
     <span>响应式前端展示 · 交易复盘系统</span>
   </footer>
+
+  <!-- 当日详情弹窗 -->
+  <div id="dayModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="dayModalTitle">
+    <div class="box">
+      <span id="dayModalClose" class="close">关闭</span>
+      <h3 id="dayModalTitle">当日交易详情</h3>
+      <div id="dayModalBody"></div>
+    </div>
+  </div>
 
   <script src="assets/index.js"></script>
 </body>

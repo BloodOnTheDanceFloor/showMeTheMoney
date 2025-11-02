@@ -35,14 +35,17 @@ class TradeReviewApp:
         self._build_ui()
 
     def _default_output_path(self):
-        # 默认输出到项目根 reports/trade_review.html（若不可写则回退到模块内）
-        proj_root = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
-        root_reports = os.path.join(proj_root, 'reports')
+        # 默认输出到模块内 reports/trade_review.html
+        mod_reports = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'reports')
         try:
+            os.makedirs(mod_reports, exist_ok=True)
+            return os.path.join(mod_reports, 'trade_review.html')
+        except Exception:
+            # 如果模块内目录不可写，则尝试项目根目录
+            proj_root = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
+            root_reports = os.path.join(proj_root, 'reports')
             os.makedirs(root_reports, exist_ok=True)
             return os.path.join(root_reports, 'trade_review.html')
-        except Exception:
-            return os.path.join(os.path.dirname(os.path.abspath(__file__)), 'reports', 'trade_review.html')
 
     def _build_ui(self):
         pad = {'padx': 12, 'pady': 8}
@@ -124,6 +127,18 @@ class TradeReviewApp:
         except Exception as e:
             self._log(f'静态资源同步失败：{e}')
 
+    def _find_available_port(self, start_port=8000, max_attempts=10):
+        """查找可用端口，避免端口冲突"""
+        import socket
+        for port in range(start_port, start_port + max_attempts):
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.bind(('localhost', port))
+                    return port
+            except OSError:
+                continue
+        return start_port  # 如果都不可用，返回初始端口，让系统报错
+
     def _start_server_and_open(self, site_dir: str, port: int = 8000):
         """在输出目录启动本地HTTP服务器，并自动打开 index.html 进行预览。"""
         try:
@@ -134,6 +149,13 @@ class TradeReviewApp:
                     time.sleep(0.5)
                 except Exception:
                     pass
+            
+            # 查找可用端口
+            available_port = self._find_available_port(port)
+            if available_port != port:
+                self._log(f'端口 {port} 已被占用，切换到可用端口 {available_port}')
+                port = available_port
+                self.server_port = port
 
             self._log(f'启动本地预览服务器: http://localhost:{port}/ （目录：{site_dir}）')
             # 使用当前Python解释器启动http.server
@@ -167,11 +189,13 @@ class TradeReviewApp:
             # 同步交互页面静态资源到输出目录，前端将读取同目录的 data/*.json
             self._sync_static_site(out)
             # 启动本地服务器并自动打开 index.html
-            self._start_server_and_open(os.path.dirname(out), self.server_port)
+            # 确保服务器在模块内reports目录运行
+            out_dir = os.path.dirname(os.path.abspath(out))
+            self._start_server_and_open(out_dir, self.server_port)
             self._log('生成完成')
-            msg = f'报告已生成:\n{out}\n\n交互仪表盘：{os.path.join(os.path.dirname(out), "index.html")}\n' \
-                  f'个股详情页：{os.path.join(os.path.dirname(out), "stock.html")}\n' \
-                  f'数据目录：{os.path.join(os.path.dirname(out), "data")}'
+            msg = f'报告已生成:\n{out}\n\n交互仪表盘：{os.path.join(out_dir, "index.html")}\n' \
+                  f'个股详情页：{os.path.join(out_dir, "stock.html")}\n' \
+                  f'数据目录：{os.path.join(out_dir, "data")}'
             messagebox.showinfo('成功', msg)
         except Exception as e:
             self._log(f'错误: {e}')
