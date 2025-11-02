@@ -193,10 +193,7 @@ class TradeReviewApp:
             out_dir = os.path.dirname(os.path.abspath(out))
             self._start_server_and_open(out_dir, self.server_port)
             self._log('生成完成')
-            msg = f'报告已生成:\n{out}\n\n交互仪表盘：{os.path.join(out_dir, "index.html")}\n' \
-                  f'个股详情页：{os.path.join(out_dir, "stock.html")}\n' \
-                  f'数据目录：{os.path.join(out_dir, "data")}'
-            messagebox.showinfo('成功', msg)
+            # 成功时不再显示确认对话框，直接通过日志和浏览器预览展示结果
         except Exception as e:
             self._log(f'错误: {e}')
             messagebox.showerror('错误', f'生成失败: {e}')

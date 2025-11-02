@@ -22,31 +22,93 @@ function applyTheme(theme) {
 }
 
 function setupThemeSelector(onChange) {
+  // 新的主题切换按钮
+  const lightBtn = document.getElementById('themeLight');
+  const darkBtn = document.getElementById('themeDark');
+  
+  if (lightBtn && darkBtn) {
+    const cur = localStorage.getItem('theme') || 'light';
+    
+    // 设置初始状态
+    if (cur === 'light') {
+      lightBtn.classList.add('active');
+    } else {
+      darkBtn.classList.add('active');
+    }
+    
+    // 绑定点击事件
+    lightBtn.addEventListener('click', () => {
+      applyTheme('light');
+      lightBtn.classList.add('active');
+      darkBtn.classList.remove('active');
+      if (typeof onChange === 'function') onChange('light');
+    });
+    
+    darkBtn.addEventListener('click', () => {
+      applyTheme('dark');
+      darkBtn.classList.add('active');
+      lightBtn.classList.remove('active');
+      if (typeof onChange === 'function') onChange('dark');
+    });
+  }
+  
+  // 保留旧的下拉选择器支持
   const sel = document.getElementById('themeSelect');
-  if (!sel) return;
-  const cur = localStorage.getItem('theme') || 'classic';
-  sel.value = cur;
-  sel.addEventListener('change', () => {
-    applyTheme(sel.value);
-    if (typeof onChange === 'function') onChange(sel.value);
-  });
+  if (sel) {
+    const cur = localStorage.getItem('theme') || 'classic';
+    sel.value = cur;
+    sel.addEventListener('change', () => {
+      applyTheme(sel.value);
+      if (typeof onChange === 'function') onChange(sel.value);
+    });
+  }
 }
 
 function setupFontSizeControl() {
+  // 新的字体大小按钮
+  const increaseBtn = document.getElementById('fontSizeIncrease');
+  const decreaseBtn = document.getElementById('fontSizeDecrease');
+  
+  if (increaseBtn && decreaseBtn) {
+    const saved = Number(localStorage.getItem('font-scale') || '1');
+    const clamp = (v) => Math.min(1.5, Math.max(0.85, v));
+    const setScale = (v) => {
+      const s = clamp(Number(v) || 1);
+      document.documentElement.style.setProperty('--font-scale', s);
+      try { localStorage.setItem('font-scale', String(s)); } catch (e) {}
+    };
+    
+    // 设置初始字体大小
+    setScale(saved);
+    
+    // 绑定点击事件
+    increaseBtn.addEventListener('click', () => {
+      const currentScale = Number(localStorage.getItem('font-scale') || '1');
+      setScale(currentScale + 0.1);
+    });
+    
+    decreaseBtn.addEventListener('click', () => {
+      const currentScale = Number(localStorage.getItem('font-scale') || '1');
+      setScale(currentScale - 0.1);
+    });
+  }
+  
+  // 保留旧的滑块控制支持
   const el = document.getElementById('fontSize');
   const txt = document.getElementById('fontSizeVal');
-  if (!el) return;
-  const saved = Number(localStorage.getItem('font-scale') || '1');
-  const clamp = (v) => Math.min(1.5, Math.max(0.85, v));
-  const setScale = (v) => {
-    const s = clamp(Number(v) || 1);
-    document.documentElement.style.setProperty('--font-scale', s);
-    try { localStorage.setItem('font-scale', String(s)); } catch (e) {}
-    if (txt) txt.textContent = `${(s*100).toFixed(0)}%`;
-  };
-  el.value = String(saved);
-  setScale(saved);
-  el.addEventListener('input', () => setScale(el.value));
+  if (el) {
+    const saved = Number(localStorage.getItem('font-scale') || '1');
+    const clamp = (v) => Math.min(1.5, Math.max(0.85, v));
+    const setScale = (v) => {
+      const s = clamp(Number(v) || 1);
+      document.documentElement.style.setProperty('--font-scale', s);
+      try { localStorage.setItem('font-scale', String(s)); } catch (e) {}
+      if (txt) txt.textContent = `${(s*100).toFixed(0)}%`;
+    };
+    el.value = String(saved);
+    setScale(saved);
+    el.addEventListener('input', () => setScale(el.value));
+  }
 }
 
 function fmtPnl(p) {
@@ -88,12 +150,21 @@ function renderMonthlyChart(months) {
         legend: { display: false },
         zoom: { zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }, pan: { enabled: true, mode: 'x' } }
       },
-      onClick: (evt, elements) => {
-        const points = window.__monthlyChart.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true);
-        if (points && points.length) {
-          const i = points[0].index;
-          const month = labels[i];
-          setSelectedMonth(month);
+      onClick: (evt) => {
+        // 修改为点击整个纵向区域即可选择月份
+        const rect = window.__monthlyChart.canvas.getBoundingClientRect();
+        const x = evt.clientX - rect.left;
+        const chartArea = window.__monthlyChart.chartArea;
+        const xAxis = window.__monthlyChart.scales.x;
+        
+        // 检查点击是否在图表区域内
+        if (x >= chartArea.left && x <= chartArea.right) {
+          // 计算点击位置对应的索引
+          const index = Math.floor((x - chartArea.left) / ((chartArea.right - chartArea.left) / labels.length));
+          if (index >= 0 && index < labels.length) {
+            const month = labels[index];
+            setSelectedMonth(month);
+          }
         }
       }
     }
@@ -201,9 +272,13 @@ async function init() {
     setupThemeSelector(() => {
       renderMonthlyChart(months);
       renderDailyTimeline(window.__tradesAll, window.__selectedMonth);
-      renderPositionsDonut(positions);
-      renderPositionTrend(posTs);
+      renderPositionsDonut(positions, window.__selectedMonth);
+      renderProfitTrend(trades);
     });
+    
+    // 添加总体概览
+    renderOverallSummary(months, trades);
+    
     // 默认选中最后一个月份
     const defaultMonth = months.length ? months[months.length - 1].month : undefined;
     setSelectedMonth(defaultMonth);
@@ -211,8 +286,8 @@ async function init() {
     const stocks = await fetchJSON('data/stocks.json');
     renderStocksTable(stocks, 'total_pnl', 'desc');
 
-    renderPositionsDonut(positions);
-    renderPositionTrend(posTs);
+    renderPositionsDonut(positions, defaultMonth);
+    renderProfitTrend(trades);
     bindModalClose();
   } catch (e) {
     console.error(e);
@@ -224,11 +299,44 @@ init();
 
 // ----- New components -----
 
+function renderOverallSummary(months, trades) {
+  const box = document.getElementById('overallSummaryGrid');
+  if (!box) return;
+  
+  const totalPnl = months.reduce((sum, m) => sum + Number(m.total_pnl || 0), 0);
+  const totalTrades = trades.length;
+  const wins = trades.filter(t => Number(t.pnl || 0) > 0).length;
+  const losses = trades.filter(t => Number(t.pnl || 0) < 0).length;
+  const winRate = totalTrades > 0 ? (wins / totalTrades * 100) : 0;
+  const plRatio = losses > 0 ? (wins / losses) : wins;
+  const activeStocks = new Set(trades.map(t => t.code)).size;
+  
+  box.innerHTML = `
+    <div class="k"><div class="t">总盈亏（元）</div><div class="v">${fmtPnl(totalPnl)}</div></div>
+    <div class="k"><div class="t">总交易笔数</div><div class="v">${totalTrades}</div></div>
+    <div class="k"><div class="t">总胜率</div><div class="v">${winRate.toFixed(2)}%</div></div>
+    <div class="k"><div class="t">盈亏比例（笔数）</div><div class="v">${(plRatio || 0).toFixed(2)}</div></div>
+    <div class="k"><div class="t">交易股票数量</div><div class="v">${activeStocks}</div></div>
+  `;
+}
+
 function setSelectedMonth(m) {
   window.__selectedMonth = m;
   if (m) {
     renderTopSummary(m, window.__tradesAll);
     renderDailyTimeline(window.__tradesAll, m);
+    // 更新持仓环形图以显示选定月份的数据
+    renderPositionsDonut(window.__positions, m);
+    
+    // 高亮显示选中的月份
+    const monthElements = document.querySelectorAll('.month .head .m');
+    monthElements.forEach(el => {
+      if (el.textContent === m) {
+        el.parentElement.parentElement.classList.add('selected');
+      } else {
+        el.parentElement.parentElement.classList.remove('selected');
+      }
+    });
   }
 }
 
@@ -296,29 +404,98 @@ function renderDailyTimeline(trades, month) {
   });
 }
 
-function renderPositionsDonut(positions) {
+function renderPositionsDonut(positions, selectedMonth) {
   const ctx = document.getElementById('positionsDonut');
-  if (!ctx || !positions || !positions.length) return;
+  if (!ctx) return;
   if (window.__posDonut) { window.__posDonut.destroy(); }
-  const labels = positions.map(p => `${p.code}${p.name ? ' '+p.name : ''}`);
-  const data = positions.map(p => Math.max(0, Number(p.position_qty || 0)));
+  
+  // 保存全局引用以便月份切换时使用
+  window.__positions = positions;
+  
+  // 如果没有选定月份，则不显示数据
+  if (!selectedMonth || !positions || !positions.length) return;
+  
+  // 过滤出选定月份的持仓数据
+  const monthPositions = positions.filter(p => {
+    const posDate = p.date || '';
+    return posDate.startsWith(selectedMonth);
+  });
+  
+  // 如果该月没有持仓数据，则不显示
+  if (!monthPositions.length) return;
+  
+  // 按股票代码分组，取每个股票在该月的最后一条记录
+  const stockMap = new Map();
+  monthPositions.forEach(p => {
+    const key = p.code;
+    if (!stockMap.has(key) || p.date > stockMap.get(key).date) {
+      stockMap.set(key, p);
+    }
+  });
+  
+  const filteredPositions = Array.from(stockMap.values()).filter(p => Number(p.position_qty || 0) > 0);
+  
+  // 如果没有有效持仓，则不显示
+  if (!filteredPositions.length) return;
+  
+  const labels = filteredPositions.map(p => `${p.code}${p.name ? ' '+p.name : ''}`);
+  const data = filteredPositions.map(p => Math.max(0, Number(p.position_qty || 0)));
   const accent = getCssVar('--accent') || '#4FC3F7';
   const grid = getCssVar('--border') || '#1f2937';
   const text = getCssVar('--text') || '#e5e7eb';
   const colors = labels.map((_, i) => `hsla(${(i*37)%360}, 70%, 60%, 0.75)`);
+  
   window.__posDonut = new Chart(ctx, {
     type: 'doughnut',
     data: { labels, datasets: [{ label: '持仓股数占比', data, backgroundColor: colors, borderColor: grid }] },
-    options: { responsive: true, plugins: { legend: { labels: { color: text } }, tooltip: { callbacks: { label: (c) => `${c.label}: ${c.parsed.toLocaleString()} 股` } }, zoom: { zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'xy' }, pan: { enabled: true, mode: 'xy' } } } }
+    options: { 
+      responsive: true, 
+      plugins: { 
+        legend: { labels: { color: text } }, 
+        tooltip: { callbacks: { label: (c) => `${c.label}: ${c.parsed.toLocaleString()} 股` } },
+        title: {
+          display: true,
+          text: `${selectedMonth} 持仓分布`,
+          color: text,
+          font: { size: 14 }
+        }
+      } 
+    }
   });
 }
 
-function renderPositionTrend(ts) {
-  const ctx = document.getElementById('positionTrend');
+function renderProfitTrend(ts) {
+  const ctx = document.getElementById('profitTrend');
   if (!ctx || !ts || !ts.length) return;
-  if (window.__posTrend) { window.__posTrend.destroy(); }
-  const labels = ts.map(x => x.date);
-  const data = ts.map(x => Number(x.net_qty_cum || 0));
+  if (window.__profitTrend) { window.__profitTrend.destroy(); }
+  
+  // 按日期对交易进行分组，计算每日累计盈亏
+  const dailyPnl = {};
+  let cumulativePnl = 0;
+  
+  ts.forEach(item => {
+    if (item.pnl) {
+      const date = item.sell_date || item.sell_dt;
+      if (date && !dailyPnl[date]) {
+        dailyPnl[date] = 0;
+      }
+      if (date) {
+        dailyPnl[date] += Number(item.pnl);
+      }
+    }
+  });
+  
+  // 按日期排序并计算累计盈亏
+  const sortedDates = Object.keys(dailyPnl).sort();
+  const labels = [];
+  const data = [];
+  
+  sortedDates.forEach(date => {
+    cumulativePnl += dailyPnl[date];
+    labels.push(date);
+    data.push(cumulativePnl);
+  });
+  
   const gctx = ctx.getContext('2d');
   const accent = getCssVar('--accent') || '#4FC3F7';
   const grid = getCssVar('--border') || '#1f2937';
@@ -326,10 +503,33 @@ function renderPositionTrend(ts) {
   const grad = gctx.createLinearGradient(0, 0, 0, ctx.height);
   grad.addColorStop(0, 'rgba(79, 195, 247, 0.35)');
   grad.addColorStop(1, 'rgba(79, 195, 247, 0.05)');
-  window.__posTrend = new Chart(ctx, {
+  
+  window.__profitTrend = new Chart(ctx, {
     type: 'line',
-    data: { labels, datasets: [{ label: '净持仓股数（累计）', data, borderColor: accent, backgroundColor: grad, fill: true }] },
-    options: { responsive: true, plugins: { legend: { display: false }, zoom: { zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }, pan: { enabled: true, mode: 'x' } } }, scales: { x: { ticks: { color: text }, grid: { color: grid } }, y: { ticks: { color: text }, grid: { color: grid } } } }
+    data: { 
+      labels, 
+      datasets: [{ 
+        label: '累计盈亏（元）', 
+        data, 
+        borderColor: accent, 
+        backgroundColor: grad, 
+        fill: true 
+      }] 
+    },
+    options: { 
+      responsive: true, 
+      plugins: { 
+        legend: { display: false }, 
+        zoom: { 
+          zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }, 
+          pan: { enabled: true, mode: 'x' } 
+        } 
+      }, 
+      scales: { 
+        x: { ticks: { color: text }, grid: { color: grid } }, 
+        y: { ticks: { color: text }, grid: { color: grid } } 
+      } 
+    }
   });
 }
 

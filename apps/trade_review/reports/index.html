@@ -1,74 +1,94 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>交易汇总仪表盘</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>交易回顾报告</title>
   <link rel="stylesheet" href="assets/style.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
 </head>
 <body>
-  <header class="header">
-    <h1>交易汇总仪表盘</h1>
-    <div class="controls">
-      <p class="sub">数据源：成交报告单.xlsx</p>
-      <label class="sub" for="themeSelect">主题：</label>
-      <select id="themeSelect" class="theme-select">
-        <option value="classic">经典（红涨绿跌）</option>
-        <option value="dark">深色专业（炭黑）</option>
-        <option value="deepblue">深灰蓝终端</option>
-        <option value="bluegray">蓝灰商务</option>
-      </select>
-      <label class="sub" for="fontSize">字体：</label>
-      <input id="fontSize" type="range" min="0.85" max="1.5" step="0.05" />
-      <span id="fontSizeVal" class="sub"></span>
-    </div>
-  </header>
+  <div class="container">
+    <header>
+      <h1>交易回顾报告</h1>
+      <div class="theme-selector">
+        <button id="themeLight" class="theme-btn">浅色</button>
+        <button id="themeDark" class="theme-btn">深色</button>
+        <button id="fontSizeIncrease" class="font-btn">A+</button>
+        <button id="fontSizeDecrease" class="font-btn">A-</button>
+      </div>
+    </header>
 
-  <main class="container">
-    <section class="card" id="topSummary">
-      <h2>当月概览</h2>
-      <div id="topSummaryGrid" class="summary"></div>
-    </section>
+    <main>
+      <!-- 总体概览 -->
+      <section class="card">
+        <h2>总体概览</h2>
+        <div id="overallSummaryGrid" class="summary"></div>
+      </section>
 
-    <section class="card">
-      <h2>每月盈亏</h2>
-      <canvas id="monthlyChart" height="120"></canvas>
-    </section>
+      <!-- 月度盈亏图表 -->
+      <section class="card">
+        <h2>每月盈亏</h2>
+        <div class="chart-container">
+          <canvas id="monthlyChart"></canvas>
+        </div>
+      </section>
 
-    <section class="grid2">
+      <!-- 当月概览 -->
+      <section class="card">
+        <h2>当月概览</h2>
+        <div id="topSummaryGrid" class="summary"></div>
+      </section>
+
+      <!-- 交易记录时间轴 -->
       <section class="card">
         <h2>交易记录时间轴（按日分组）</h2>
-        <canvas id="dailyTimeline" height="120"></canvas>
+        <div class="chart-container">
+          <canvas id="dailyTimeline"></canvas>
+        </div>
       </section>
+
+      <!-- 持仓分布 -->
       <section class="card">
-        <h2>持仓股票分布环形图</h2>
-        <canvas id="positionsDonut" height="120"></canvas>
+        <h2>持仓股票分布</h2>
+        <div class="chart-container">
+          <canvas id="positionsDonut"></canvas>
+        </div>
       </section>
-    </section>
 
-    <section class="card">
-      <h2>月份与该月操作个股</h2>
-      <div id="monthsList" class="months"></div>
-    </section>
+      <!-- 盈利变化趋势 -->
+      <section class="card">
+        <h2>盈利变化趋势</h2>
+        <div class="chart-container">
+          <canvas id="profitTrend"></canvas>
+        </div>
+      </section>
 
-    <section class="card">
-      <h2>个股交易汇总</h2>
-      <div id="stocksTable"></div>
-      <h2 style="margin-top:16px">股票持仓变化趋势折线图</h2>
-      <canvas id="positionTrend" height="120"></canvas>
-    </section>
-  </main>
+      <!-- 个股交易汇总 -->
+      <section class="card">
+        <h2>个股交易汇总</h2>
+        <div class="scrollable-table">
+          <div id="stocksTable"></div>
+        </div>
+      </section>
 
-  <footer class="footer">
-    <span>响应式前端展示 · 交易复盘系统</span>
-  </footer>
+      <!-- 月度交易记录 -->
+      <section class="card">
+        <h2>月度交易记录</h2>
+        <div id="monthsList" class="months"></div>
+      </section>
+    </main>
 
-  <!-- 当日详情弹窗 -->
-  <div id="dayModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="dayModalTitle">
+    <footer class="footer">
+      <span>响应式前端展示 · 交易复盘系统</span>
+    </footer>
+  </div>
+
+  <!-- 日交易详情弹窗 -->
+  <div id="dayModal" class="modal">
     <div class="box">
-      <span id="dayModalClose" class="close">关闭</span>
+      <span id="dayModalClose" class="close">&times;</span>
       <h3 id="dayModalTitle">当日交易详情</h3>
       <div id="dayModalBody"></div>
     </div>
