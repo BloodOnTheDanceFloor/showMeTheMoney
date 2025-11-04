@@ -96,33 +96,33 @@ class PNFChart:
                     df.columns = [str(c).strip() for c in df.columns]
                 if '时间' in df.columns:
                     df['时间'] = df['时间'].astype(str).str.strip()
-                required_columns = ['时间', '最高', '最低', '开盘', '收盘']
+                required_columns = ['时间', '最高', '最低', '开盘', '收盘', '成交额']
                 if not all(col in df.columns for col in required_columns):
                     # 若缺失必需列，尝试按位置映射修复
-                    if df.shape[1] >= 5:
+                    if df.shape[1] >= 6:
                         # 保存原始列名以便调试
                         original_columns = df.columns.tolist()
                         print(f"原始列名: {original_columns}")
                         
                         # 尝试多种常见的列顺序
                         column_orders = [
-                            # 顺序1: 时间、最高、最低、开盘、收盘 (300308.xls, 301308.xls)
-                            ['时间', '最高', '最低', '开盘', '收盘'],
-                            # 顺序2: 时间、开盘、最高、最低、收盘 (其他文件)
-                            ['时间', '开盘', '最高', '最低', '收盘'],
-                            # 顺序3: 时间、收盘、最高、最低、开盘 (可能的其他变体)
-                            ['时间', '收盘', '最高', '最低', '开盘']
+                            # 顺序1: 时间、最高、最低、开盘、收盘、成交额
+                            ['时间', '最高', '最低', '开盘', '收盘', '成交额'],
+                            # 顺序2: 时间、开盘、最高、最低、收盘、成交额
+                            ['时间', '开盘', '最高', '最低', '收盘', '成交额'],
+                            # 顺序3: 时间、收盘、最高、最低、开盘、成交额
+                            ['时间', '收盘', '最高', '最低', '开盘', '成交额']
                         ]
                         
                         # 尝试每种列顺序
                         for i, column_order in enumerate(column_orders):
-                            df_pos = df.iloc[:, :5].copy()
+                            df_pos = df.iloc[:, :6].copy()
                             df_pos.columns = column_order
                             
                             # 标准化类型
                             df_pos['时间'] = df_pos['时间'].astype(str).str.strip()
                             try:
-                                for c in ['最高', '最低', '开盘', '收盘']:
+                                for c in ['最高', '最低', '开盘', '收盘', '成交额']:
                                     df_pos[c] = pd.to_numeric(df_pos[c], errors='coerce')
                                 
                                 # 检查数据是否合理（最高价应该 >= 最低价）
@@ -132,7 +132,7 @@ class PNFChart:
                                 print(f"顺序{i+1}验证: 有效行比例 {valid_percent:.2%}")
                                 
                                 if valid_percent > 0.8:  # 80%以上的行数据合理
-                                    self.data = df_pos.dropna(subset=['最高', '最低', '开盘', '收盘']).reset_index(drop=True)
+                                    self.data = df_pos.dropna(subset=['最高', '最低', '开盘', '收盘', '成交额']).reset_index(drop=True)
                                     print(f"使用位置映射修复列名 (顺序{i+1}: {'/'.join(column_order)})")
                                     return True
                             except Exception as e:
@@ -145,9 +145,9 @@ class PNFChart:
                         print("错误: Excel/TSV 文件缺少必要列，且列数不足以通过位置映射修复")
                         return False
                 # 正常路径：强制数值化并去除缺失
-                for c in ['最高', '最低', '开盘', '收盘']:
+                for c in ['最高', '最低', '开盘', '收盘', '成交额']:
                     df[c] = pd.to_numeric(df[c], errors='coerce')
-                self.data = df.dropna(subset=['最高', '最低', '开盘', '收盘']).reset_index(drop=True)
+                self.data = df.dropna(subset=['最高', '最低', '开盘', '收盘', '成交额']).reset_index(drop=True)
                 return True
 
             if ext == '.xlsx':
@@ -329,6 +329,7 @@ class PNFChart:
                     'close': float(day_rec['收盘']),
                     'high': float(day_rec['最高']),
                     'low': float(day_rec['最低']),
+                    'turnover': float(day_rec['成交额']),
                 }
             except Exception:
                 # 若某字段异常，尽可能保留基本信息
@@ -341,6 +342,7 @@ class PNFChart:
                     'close': float(day_rec.get('收盘', price)) if hasattr(day_rec, 'get') else float(price),
                     'high': float(day_rec.get('最高', price)) if hasattr(day_rec, 'get') else float(price),
                     'low': float(day_rec.get('最低', price)) if hasattr(day_rec, 'get') else float(price),
+                    'turnover': float(day_rec.get('成交额', 0)) if hasattr(day_rec, 'get') else 0,
                 }
             self.mark_points.append(meta)
 

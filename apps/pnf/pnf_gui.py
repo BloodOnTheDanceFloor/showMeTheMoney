@@ -277,6 +277,36 @@ class PNFChartApp:
                 artist = self.ax.text(col_idx, price, symbol, ha='center', va='center', color=color, fontsize=12)
                 self.mark_artists.append({'artist': artist, 'meta': mp})
             
+            # 计算每列的总成交额
+            column_turnovers = {}
+            for mp in getattr(self.pnf_chart, 'mark_points', []):
+                col = mp['col']
+                turnover = mp.get('turnover', 0)
+                if col not in column_turnovers:
+                    column_turnovers[col] = 0
+                column_turnovers[col] += turnover
+            
+            # 设置Y轴刻度标签为总成交额
+            y_ticks = self.ax.get_yticks()
+            y_tick_labels = []
+            for y in y_ticks:
+                # 找到y值所在列
+                col_at_y = -1
+                for mp in getattr(self.pnf_chart, 'mark_points', []):
+                    if abs(mp['price'] - y) < self.pnf_chart.box_size / 2:
+                        col_at_y = mp['col']
+                        break
+                
+                if col_at_y != -1 and col_at_y in column_turnovers:
+                    turnover_str = f"{column_turnovers[col_at_y]/1e8:.2f}亿" if column_turnovers[col_at_y] > 1e8 else f"{column_turnovers[col_at_y]/1e4:.2f}万"
+                    y_tick_labels.append(turnover_str)
+                else:
+                    y_tick_labels.append(f"{y:.2f}")
+
+            # self.ax.set_yticklabels(y_tick_labels)
+            self.ax.set_yticklabels(y_tick_labels)
+
+
             # 设置图表标题和标签
             reversal_type = f"{self.pnf_chart.reversal_boxes}点图"
             # 使用 Excel A1 标题（去除前导空格）作为图表标题
@@ -308,15 +338,18 @@ class PNFChartApp:
 
         # 近邻阈值判断（容差），避免依赖字体命中检测
         hit_item = None
+        min_dist = float('inf')
+        
         for item in self.mark_artists:
             meta = item['meta']
             col = meta['col']
             price = meta['price']
-            if abs(event.xdata - col) <= 0.35 and abs(event.ydata - price) <= max(self.pnf_chart.box_size * 0.5, 0.1):
+            dist = (event.xdata - col)**2 + ((event.ydata - price) / self.pnf_chart.box_size)**2
+            if dist < min_dist:
+                min_dist = dist
                 hit_item = item
-                break
 
-        if hit_item is None:
+        if hit_item is None or min_dist > 0.5: # 调整阈值
             if self.hover_annot:
                 self.hover_annot.set_visible(False)
             if self.hover_arrow:
@@ -332,6 +365,8 @@ class PNFChartApp:
         cl = meta['close']
         hi = meta['high']
         lo = meta['low']
+        turnover = meta.get('turnover', 0)
+        turnover_str = f"{turnover/1e8:.2f}亿" if turnover > 1e8 else f"{turnover/1e4:.2f}万"
         # 使用兼容性更好的符号，避免字体缺失：上 '^'（红），下 'v'（绿），平盘 '—'
         is_up = cl > op
         is_down = cl < op
@@ -343,6 +378,7 @@ class PNFChartApp:
             f"坐标: ({col + 1}, {price:.2f})\n"
             f"开盘: {op:.2f}  收盘: {cl:.2f}\n"
             f"最高: {hi:.2f}  最低: {lo:.2f}\n"
+            f"成交额: {turnover_str}\n"
             f"标记: {arrow_symbol}"
         )
 
