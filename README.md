@@ -1,8 +1,9 @@
 # 股票分析工具集（PNF + 交易复盘）
 
-本仓库包含两个模块：
+本仓库包含三个模块：
 - PNF 点数图（桌面 GUI）
 - 交易复盘（数据解析、FIFO撮合、报表与前端仪表盘）
+- CSRC 处罚决定书下载（命令行脚本）
 
 ---
 
@@ -92,6 +93,27 @@ apps/
       data/           # 由 trade_review.py 运行时生成的 JSON 输出
 ```
 
+---
+
+## 模块三：CSRC 处罚决定书下载（命令行）
+
+功能：从巨潮资讯网检索“证监会行政处罚决定书”，批量下载附件并按年份分类保存。
+
+使用方法：
+- 安装依赖：`pip install -r requirements.txt`
+- 运行示例：
+  - 下载全部页（直到无数据）：
+    - `python -m apps.csrc_penalties.cli`
+  - 指定最大页数与输出目录，避免过快请求设置延迟：
+    - `python -m apps.csrc_penalties.cli --max-pages 10 --out e:\\downloads\\csrc --delay 0.5`
+  - 自定义关键字搜索：
+    - `python -m apps.csrc_penalties.cli --query "证监会行政处罚决定书"`
+
+说明：
+- 默认输出目录：`apps/csrc_penalties/downloads/<年份>/<标题>.<扩展名>`。
+- 标题会自动清洗非法字符；若已存在同名文件，默认跳过（可加 `--no-skip-existing` 不跳过）。
+- 接口返回的附件字段可能为 `adjunctUrl/attachPath/pdfUrl` 中之一，脚本会自动拼接到 `http://static.cninfo.com.cn/` 下载。
+
 ### 常见问题（FAQ）
 - 访问页面报错 `Chart is not defined`：请确保 `index.html` 通过 CDN 引入了 `Chart.js` 与 `chartjs-plugin-zoom`，或使用本地服务器 `http.server` 访问页面（直接双击可能存在跨域与 MIME 限制）。
 - 页面点击“每月盈亏”无响应：请确认 `assets/index.js` 已加载、浏览器控制台无报错、`reports/data/monthly.json` 存在且格式正确。
@@ -117,11 +139,15 @@ matplotlib
 numpy
 openpyxl
 xlrd
+requests
+pytest
 ```
 
 - `pandas`/`numpy`：数据读取与处理。
 - `openpyxl`/`xlrd`：读取 `.xlsx`/`.xls`（pandas 通过这些引擎）。
 - `matplotlib`：后端生成基础可视化（用于 `trade_review.html` 简版报告）。
+- `requests`：CSRC 处罚决定书下载脚本的网络请求。
+- `pytest`：可选的测试框架（如需为后端逻辑编写单元测试）。
 - 桌面 GUI 使用 `tkinter`，为标准库无需额外安装。
 - 前端使用 Chart.js（CDN），无需写入 `requirements.txt`。
 
@@ -134,6 +160,8 @@ matplotlib>=3.7
 numpy>=1.24
 openpyxl>=3.1
 xlrd>=2.0
+requests>=2.31
+pytest>=7.0
 ```
 （视你的环境与兼容性需求选择是否加版本约束）
 
