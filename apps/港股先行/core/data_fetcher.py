@@ -7,47 +7,164 @@
 import time
 import akshare as ak
 import pandas as pd
+import random
+import requests
 from datetime import datetime, timedelta
-from logger import setup_logger
+from utils.logger import setup_logger
+from utils.proxy_pool import get_proxy_session
 
 # 设置日志
 logger = setup_logger()
 
+# 数据缓存机制
+data_cache = {}
+cache_timeout = 300  # 缓存5分钟
+
+def is_cache_valid(cache_key):
+    """检查缓存是否有效"""
+    if cache_key in data_cache:
+        cache_time, cache_data = data_cache[cache_key]
+        if datetime.now() - cache_time < timedelta(seconds=cache_timeout):
+            return True
+        else:
+            del data_cache[cache_key]
+    return False
+
+def get_cached_data(cache_key):
+    """获取缓存数据"""
+    if is_cache_valid(cache_key):
+        logger.info(f"使用缓存数据: {cache_key}")
+        return data_cache[cache_key][1]
+    return None
+
+def set_cache_data(cache_key, data):
+    """设置缓存数据"""
+    data_cache[cache_key] = (datetime.now(), data)
+    logger.info(f"设置缓存数据: {cache_key}")
+
+def add_random_delay():
+    """添加随机延迟，避免固定频率请求"""
+    delay = random.uniform(3, 8)  # 3-8秒随机延迟，增加等待时间
+    logger.info(f"添加随机延迟: {delay:.2f}秒")
+    time.sleep(delay)
+
+
+
 # API重试配置
-MAX_RETRIES = 3
-RETRY_DELAY = 5  # 秒
+MAX_RETRIES = 5  # 增加到5次重试
+RETRY_DELAY = 15  # 延长到15秒，避免频繁重试
 
 def retry_on_failure(func):
-    """API调用失败重试装饰器"""
+    """API调用失败重试装饰器（优化版）"""
     def wrapper(*args, **kwargs):
         for i in range(MAX_RETRIES):
             try:
+                # 添加随机延迟
+                if i > 0:  # 第一次不延迟
+                    add_random_delay()
                 return func(*args, **kwargs)
             except Exception as e:
                 if i == MAX_RETRIES - 1:
                     logger.error(f"API调用失败，已达最大重试次数: {str(e)}")
                     raise
-                logger.warning(f"API调用失败，{RETRY_DELAY}秒后重试 ({i+1}/{MAX_RETRIES}): {str(e)}")
-                time.sleep(RETRY_DELAY)
+                # 递增重试延迟
+                retry_delay = RETRY_DELAY * (i + 1) + random.uniform(1, 3)
+                logger.warning(f"API调用失败，{retry_delay:.1f}秒后重试 ({i+1}/{MAX_RETRIES}): {str(e)}")
+                time.sleep(retry_delay)
     return wrapper
 
 @retry_on_failure
 def get_hk_stock_data(symbol, period):
-    """获取港股分钟数据"""
-    logger.info(f"获取港股数据: {symbol}, 周期: {period}")
-    return ak.stock_hk_hist_min_em(symbol=symbol, period=period)
+    """获取港股指数数据"""
+    logger.info(f"获取港股指数数据: {symbol}, 周期: {period}")
+    
+    # 生成缓存键
+    cache_key = f"hk_{symbol}_{period}"
+    
+    # 检查缓存
+    cached_data = get_cached_data(cache_key)
+    if cached_data is not None:
+        return cached_data
+    
+    # 港股指数代码映射
+    index_map = {
+        'HSI': '恒生指数',
+        'HSTECH': '恒生科技指数'
+    }
+    
+    if symbol in index_map:
+        # 获取港股指数数据 - 使用直连，不使用代理
+        logger.info("使用直连获取港股指数数据，不使用代理")
+        # 显式禁用代理
+        import os
+        os.environ['http_proxy'] = ''
+        os.environ['https_proxy'] = ''
+        # 禁用 requests 代理
+        data = ak.stock_hk_index_daily_em(symbol=symbol, proxies={"http": None, "https": None})
+    else:
+        # 获取港股个股数据 - 使用直连，不使用代理
+        logger.info("使用直连获取港股个股数据，不使用代理")
+        # 显式禁用代理
+        import os
+        os.environ['http_proxy'] = ''
+        os.environ['https_proxy'] = ''
+        # 禁用 requests 代理
+        data = ak.stock_hk_hist(symbol=symbol, period=period, proxies={"http": None, "https": None})
+    
+    # 设置缓存
+    set_cache_data(cache_key, data)
+    return data
 
 @retry_on_failure
 def get_a_index_data(symbol, period):
-    """获取A股指数分钟数据"""
+    """获取A股指数数据"""
     logger.info(f"获取A股指数数据: {symbol}, 周期: {period}")
-    return ak.index_zh_a_hist_min_em(symbol=symbol, period=period)
+    
+    # 生成缓存键
+    cache_key = f"a_index_{symbol}_{period}"
+    
+    # 检查缓存
+    cached_data = get_cached_data(cache_key)
+    if cached_data is not None:
+        return cached_data
+    
+    # A股指数代码映射
+    index_map = {
+        '000300': '沪深300',
+        'sh000300': '沪深300',
+        'sz399300': '沪深300'
+    }
+    
+    # 使用正确的A股指数接口 - 使用直连，不使用代理
+    logger.info("使用直连获取A股指数数据，不使用代理")
+    # 禁用 requests 代理
+    data = ak.index_zh_a_hist(symbol=symbol, period=period, proxies={"http": None, "https": None})
+    
+    # 设置缓存
+    set_cache_data(cache_key, data)
+    return data
 
 @retry_on_failure
 def get_futures_data(symbol, period):
     """获取期货分钟数据"""
     logger.info(f"获取期货数据: {symbol}, 周期: {period}")
-    return ak.futures_zh_minute_sina(symbol=symbol, period=period)
+    
+    # 生成缓存键
+    cache_key = f"futures_{symbol}_{period}"
+    
+    # 检查缓存
+    cached_data = get_cached_data(cache_key)
+    if cached_data is not None:
+        return cached_data
+    
+    # 获取期货数据 - 使用直连，不使用代理
+    logger.info("使用直连获取期货数据，不使用代理")
+    # 禁用 requests 代理
+    data = ak.futures_zh_minute_sina(symbol=symbol, period=period, proxies={"http": None, "https": None})
+    
+    # 设置缓存
+    set_cache_data(cache_key, data)
+    return data
 
 def get_historical_data(symbol_type, symbol, start_date, end_date, period):
     """

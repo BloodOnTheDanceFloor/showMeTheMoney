@@ -5,11 +5,12 @@
 """
 
 import time
-from datetime import datetime
-from data_fetcher import get_realtime_data, get_early_rise
-from alarm import show_condition1_alarm, show_condition2_alarm, show_condition3_alarm
-from config import DEFAULT_CONFIG
-from logger import setup_logger
+import pandas as pd
+from datetime import datetime, timedelta
+from core.data_fetcher import get_realtime_data, get_early_rise
+from core.alarm_manager import show_condition1_alarm, show_condition2_alarm, show_condition3_alarm
+from data.config import DEFAULT_CONFIG
+from utils.logger import setup_logger
 
 # 设置日志
 logger = setup_logger()
@@ -101,6 +102,12 @@ def check_condition3(hsi_data, csi300_data, ic_data, window_min, hsi_rise_thresh
     
     # 计算基差收敛
     if not csi300_data.empty and not ic_data.empty:
+        # 确保datetime列是datetime类型
+        if 'datetime' in csi300_data.columns:
+            csi300_data['datetime'] = pd.to_datetime(csi300_data['datetime'])
+        if 'datetime' in ic_data.columns:
+            ic_data['datetime'] = pd.to_datetime(ic_data['datetime'])
+        
         # 获取窗口内的现货和期货数据
         today = datetime.now().date()
         csi300_today = csi300_data[csi300_data['datetime'].dt.date == today]
@@ -109,8 +116,8 @@ def check_condition3(hsi_data, csi300_data, ic_data, window_min, hsi_rise_thresh
         if not csi300_today.empty and not ic_today.empty:
             # 获取窗口开始和结束的基差
             window_start = csi300_today.iloc[0]['datetime'].time()
-            window_end = (datetime.combine(datetime.today(), window_start) + 
-                         time.timedelta(minutes=window_min)).time()
+            window_end = (datetime.combine(datetime.now().date(), window_start) + 
+                         timedelta(minutes=window_min)).time()
             
             # 窗口开始时的基差
             start_csi300 = csi300_today.iloc[0]['close']

@@ -1,7 +1,10 @@
- pandas
+pandas
 matplotlib
 numpy
 openpyxl
 xlrd
 requests
 pytest
+akshare
+beautifulsoup4
+lxml

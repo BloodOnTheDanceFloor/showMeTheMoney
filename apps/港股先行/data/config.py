@@ -23,12 +23,12 @@ DEFAULT_CONFIG = {
     # 数据周期
     'period': '1',  # 1分钟数据
     
-    # 交易时间
-    'trading_start_time': '09:30',
-    'trading_end_time': '15:00',
+    # 交易时间 (早盘监控时段：9:15-10:30)
+    'trading_start_time': '09:15',
+    'trading_end_time': '10:30',
     
     # 检查间隔（秒）
-    'check_interval': 300,  # 5分钟
+    'check_interval': 600,  # 10分钟（进一步降低频率，避免API限制）
 }
 
 # 托市事件列表（正样本参考）
