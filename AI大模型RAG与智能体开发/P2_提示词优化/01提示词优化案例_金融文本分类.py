@@ -3,7 +3,8 @@ from openai import OpenAI
 # 1. 获取client对象，OpenAI类对象
 client = OpenAI(
     # base_url="https://dashscope.aliyuncs.com/compatible-mode/v1"
-    base_url="http://localhost:11434/v1"
+    base_url="http://localhost:11434/v1",
+    api_key="ollama"
 )
 
 examples_data = {       # 示例数据
