@@ -1,9 +1,11 @@
-# 股票分析工具集（PNF + 交易复盘）
+# 股票分析工具集（PNF + 交易复盘 + AI大模型RAG与智能体）
 
-本仓库包含三个模块：
+本仓库包含五个模块：
 - PNF 点数图（桌面 GUI）
 - 交易复盘（数据解析、FIFO撮合、报表与前端仪表盘）
 - CSRC 处罚决定书下载（命令行脚本）
+- AI大模型RAG与智能体开发（教程与示例代码）
+- AI大模型RAG与智能体开发_Agent项目（扫地机器人智能客服完整项目）
 
 ---
 
@@ -91,6 +93,29 @@ apps/
         index.js
         stock.js
       data/           # 由 trade_review.py 运行时生成的 JSON 输出
+
+AI大模型RAG与智能体开发/
+  P1_OpenAI库的基础使用/    # OpenAI API 基础教程
+  P2_提示词优化/              # 提示词工程案例
+  P3_LangChainRAG开发/        # LangChain 核心功能
+  P4_RAG项目案例/             # 完整 RAG 项目
+  P5_Agent智能体/             # Agent 智能体开发
+
+AI大模型RAG与智能体开发_Agent项目/
+  app.py                      # Streamlit 应用入口
+  agent/
+    react_agent.py            # ReAct Agent 核心
+    tools/
+      agent_tools.py          # 工具函数
+      middleware.py           # 中间件
+  rag/
+    rag_service.py            # RAG 服务
+    vector_store.py           # 向量存储
+  model/factory.py            # 模型工厂
+  config/                     # 配置文件
+  prompts/                    # 提示词文件
+  data/                       # 知识库文档
+  utils/                      # 工具类
 ```
 
 ---
@@ -121,6 +146,132 @@ apps/
 
 ---
 
+## 模块四：AI大模型RAG与智能体开发（教程与示例代码）
+
+本项目是一个系统化的 AI 大模型开发教程，涵盖从基础到进阶的完整学习路径。
+
+### 内容结构
+
+**P1_OpenAI库的基础使用**
+- API Key 测试与配置
+- OpenAI 库基础调用
+- 流式输出实现
+- 附带历史消息的模型调用
+
+**P2_提示词优化**
+- 金融文本分类案例
+- JSON 基础使用
+- 金融信息抽取案例
+- 金融文本匹配判断案例
+
+**P3_LangChain RAG开发**
+- LangChain 访问阿里云通义千问/Ollama 本地模型
+- 流式输出与聊天模型调用
+- 嵌入模型访问（阿里云/Ollama）
+- 提示词模板（通用模板、FewShot、ChatPromptTemplate）
+- Chain 基础使用与 Runnable 接口
+- 输出解析器（StrOutputParser、JsonOutputParser）
+- 会话记忆（临时/长期）
+- 文档加载器（CSV、JSON、PDF、Text）
+- 向量存储（内存/持久化）
+- 向量检索与提示词构建
+
+**P4_RAG项目案例**
+- 完整的 RAG 问答系统实现
+- 知识库管理
+- 文件上传与历史记录
+- Streamlit 交互界面
+
+**P5_Agent智能体**
+- Agent 智能体初体验
+- Stream 流式输出
+- ReAct 案例实现
+- 中间件开发
+
+### 运行方式
+
+```bash
+# 进入对应章节目录
+cd "AI大模型RAG与智能体开发/P3_LangChainRAG开发"
+
+# 运行示例
+python 14Chain的基础使用.py
+```
+
+---
+
+## 模块五：AI大模型RAG与智能体开发_Agent项目（扫地机器人智能客服）
+
+基于 LangChain 和 ReAct 架构的完整智能客服系统，专为扫地机器人产品提供智能问答服务。
+
+### 功能特性
+
+- **RAG 检索增强生成**：基于向量数据库的知识检索与答案生成
+- **ReAct Agent 架构**：支持工具调用和推理决策
+- **多工具集成**：天气查询、用户定位、外部数据获取等
+- **流式响应**：实时输出回答内容
+- **Streamlit Web 界面**：友好的交互式聊天界面
+- **中间件支持**：工具监控、日志记录、提示词切换
+
+### 项目结构
+
+```
+AI大模型RAG与智能体开发_Agent项目/
+├── app.py                    # Streamlit 应用入口
+├── agent/
+│   ├── react_agent.py        # ReAct Agent 核心实现
+│   └── tools/
+│       ├── agent_tools.py    # 工具函数集合
+│       └── middleware.py     # 中间件实现
+├── rag/
+│   ├── rag_service.py        # RAG 总结服务
+│   └── vector_store.py       # 向量存储服务
+├── model/
+│   └── factory.py            # 模型工厂
+├── config/
+│   ├── agent.yml             # Agent 配置
+│   ├── rag.yml               # RAG 配置
+│   ├── chroma.yml            # ChromaDB 配置
+│   └── prompts.yml           # 提示词配置
+├── prompts/
+│   ├── main_prompt.txt       # 主提示词
+│   ├── rag_summarize.txt     # RAG 总结提示词
+│   └── report_prompt.txt     # 报告生成提示词
+├── data/                     # 知识库文档
+│   ├── 扫地机器人100问.pdf
+│   ├── 选购指南.txt
+│   ├── 维护保养.txt
+│   └── 故障排除.txt
+└── utils/                    # 工具类
+```
+
+### 快速开始
+
+1. 安装依赖：
+```bash
+pip install -r requirements.txt
+```
+
+2. 启动智能客服：
+```bash
+cd "AI大模型RAG与智能体开发_Agent项目"
+streamlit run app.py
+```
+
+3. 在浏览器中访问 `http://localhost:8501` 开始使用
+
+### 核心工具函数
+
+- `rag_summarize`: RAG 知识库问答
+- `get_weather`: 获取天气信息
+- `get_user_location`: 获取用户位置
+- `get_user_id`: 获取用户ID
+- `get_current_month`: 获取当前月份
+- `fetch_external_data`: 获取外部数据
+- `fill_context_for_report`: 填充报告上下文
+
+---
+
 ## 冗余文件检查（对照代码与README）
 
 - `apps/trade_review/reports/assets`：包含 `index.js`、`stock.js`、`style.css`，均为前端必须文件；未使用本地 `chart.min.js`，已改为 CDN 引用，无冗余。
@@ -131,6 +282,8 @@ apps/
 ---
 
 ## 依赖说明与核对（requirements.txt）
+
+### 基础依赖（股票分析模块）
 
 `requirements.txt`：
 ```
@@ -151,9 +304,37 @@ pytest
 - 桌面 GUI 使用 `tkinter`，为标准库无需额外安装。
 - 前端使用 Chart.js（CDN），无需写入 `requirements.txt`。
 
-结论：当前 `requirements.txt` 与代码匹配、可用，无需调整。
+### AI大模型RAG与智能体开发依赖
 
-如需固定版本或增强可重复性，可建议：
+模块四和模块五需要以下额外依赖：
+
+```
+langchain
+langchain-community
+langchain-openai
+chromadb
+streamlit
+pypdf
+```
+
+- `langchain` / `langchain-community` / `langchain-openai`：LangChain 框架及扩展
+- `chromadb`：向量数据库存储
+- `streamlit`：Web 应用界面
+- `pypdf`：PDF 文档解析
+
+### 完整依赖安装
+
+```bash
+# 安装所有依赖
+pip install -r requirements.txt
+
+# 单独安装 AI 模块依赖
+pip install langchain langchain-community langchain-openai chromadb streamlit pypdf
+```
+
+### 版本建议
+
+如需固定版本或增强可重复性：
 ```
 pandas>=2.0
 matplotlib>=3.7
@@ -162,6 +343,12 @@ openpyxl>=3.1
 xlrd>=2.0
 requests>=2.31
 pytest>=7.0
+langchain>=0.3.0
+langchain-community>=0.3.0
+langchain-openai>=0.2.0
+chromadb>=0.5.0
+streamlit>=1.40.0
+pypdf>=5.0.0
 ```
 （视你的环境与兼容性需求选择是否加版本约束）
 
@@ -171,3 +358,5 @@ pytest>=7.0
 - 如需自定义交易复盘输出路径：`python -m apps.trade_review.trade_review -i <excel> -o <html输出路径>`。
 - 前端页面完全静态，无需后端服务；只要生成了 `reports/data/*.json` 即可工作。
 - 若要扩展分类（如 GC/回购），建议在后端导出 JSON 时新增字段维度，并在前端增加筛选与分组展示。
+- AI 模块需要配置 API Key（阿里云通义千问或 OpenAI），请在环境变量或配置文件中设置。
+- Agent 项目首次运行时会自动构建向量数据库，可能需要一些时间处理知识库文档。
