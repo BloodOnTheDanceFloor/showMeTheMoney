@@ -4,6 +4,17 @@ __pycache__/
 *$py.class
 *.xlsx
 # C extensions
+
+# Office temporary files
+~$*
+*.tmp
+*.~vsd
+*.~vsdx
+~*.tmp
+~*.docx
+~*.xlsx
+~*.pptx
+.~lock.*#
 *.so
 
 # Distribution / packaging
