@@ -1,10 +1,47 @@
+# 基础数据处理
 pandas
-matplotlib
 numpy
 openpyxl
 xlrd
+
+# 可视化
+matplotlib
+
+# 网络请求与解析
 requests
-pytest
-akshare
 beautifulsoup4
 lxml
+
+# 金融数据
+akshare
+
+# 测试
+pytest
+
+# OpenAI API
+openai
+
+# LangChain 核心及生态
+langchain
+langchain-core
+langchain-community
+langchain-chroma
+langchain-text-splitters
+
+# 向量数据库
+chromadb
+
+# 文档处理
+pypdf
+
+# 阿里云通义千问（DashScope）
+dashscope
+
+# Streamlit Web应用
+streamlit
+
+# YAML配置解析
+pyyaml
+
+# 其他工具
+python-dotenv
