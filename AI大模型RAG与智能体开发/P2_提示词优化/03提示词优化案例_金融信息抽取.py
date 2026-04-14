@@ -1,9 +1,11 @@
 from openai import OpenAI
 import json
+import time
 
 client = OpenAI(
     # base_url="https://dashscope.aliyuncs.com/compatible-mode/v1"
-    base_url="http://localhost:11434/v1"
+    base_url="http://localhost:11434/v1",
+    api_key="ollama"
 )
 
 schema = ['日期', '股票名称', '开盘价', '收盘价', '成交量']
@@ -64,11 +66,17 @@ for example in examples_data:
 
 
 for q in questions:
+    start_time = time.time()
+
     response = client.chat.completions.create(
         model="qwen3:4b",
         messages=messages + [{"role": "user", "content": f"按照上述的示例，现在抽取这个句子的信息：{q}"}]
     )
 
+    elapsed_time = time.time() - start_time
+
+    print(f"[用时: {elapsed_time:.2f}秒]")
     print(response.choices[0].message.content)
+    print("-" * 50)
 
 
