@@ -27,6 +27,7 @@ langchain-core
 langchain-community
 langchain-chroma
 langchain-text-splitters
+langchain_ollama
 
 # 向量数据库
 chromadb

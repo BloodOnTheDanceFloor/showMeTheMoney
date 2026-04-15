@@ -7,7 +7,7 @@ import requests
 import json
 
 OLLAMA_HOST = "http://localhost:11434"
-MODEL_NAME = "qwen3.5:4b"
+MODEL_NAME = "gpt-oss:120b-cloud"
 
 
 def chat_once(prompt: str) -> str:
