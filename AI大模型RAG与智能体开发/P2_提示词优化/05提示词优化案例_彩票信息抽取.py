@@ -5,7 +5,8 @@ import time
 client = OpenAI(
     # base_url="https://dashscope.aliyuncs.com/compatible-mode/v1"
     base_url="http://localhost:11434/v1",
-    api_key="ollama"
+    api_key="ollama",
+    timeout=1500.0  # 设置超时时间为1500秒（24 分钟），本地Ollama模型可能需要较长时间
 )
 
 schema = ['期数', '中奖号码', '一等奖']
