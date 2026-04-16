@@ -9,8 +9,8 @@ import json
 from typing import Sequence
 
 # 从 langchain_ollama 导入 Ollama 聊天模型类
-# ChatOllama 是 LangChain 提供的用于与 Ollama 本地模型交互的类
-from langchain_ollama import ChatOllama
+# OllamaLLM 是 LangChain 提供的用于与 Ollama 本地模型交互的类
+from langchain_ollama import OllamaLLM
 # 从 langchain_core.messages 导入消息相关的工具函数和基类
 # message_to_dict: 将消息对象转换为字典格式，便于存储
 # messages_from_dict: 将字典列表转换回消息对象列表
@@ -120,11 +120,7 @@ class FileChatMessageHistory(BaseChatMessageHistory):
 # ChatOllama 是专门为聊天场景设计的 Ollama 模型封装
 # model: 指定要使用的 Ollama 模型名称，需要提前通过 ollama pull 下载
 # base_url: Ollama 服务的地址，默认为 http://localhost:11434
-model = ChatOllama(
-    model="qwen3:4b",           # 使用的模型名称，可以根据需要更换
-    base_url="http://localhost:11434",  # Ollama 服务地址
-    temperature=0.7             # 温度参数，控制输出的随机性，0-1之间
-)
+model = OllamaLLM(model="gpt-oss:120b-cloud")
 
 # 创建聊天格式的提示词模板
 # 使用 from_messages 方法定义多轮对话的格式
@@ -188,8 +184,8 @@ def get_history(session_id: str) -> FileChatMessageHistory:
 # 创建带历史记录功能的对话链
 # RunnableWithMessageHistory 会自动管理历史消息的添加和检索
 conversation_chain = RunnableWithMessageHistory(
-    base_chain,                 # 基础链，被增强的原始链
-    get_history,                # 获取历史记录的函数
+    base_chain,                         # 基础链，被增强的原始链
+    get_history,                        # 获取历史记录的函数
     input_messages_key="input",         # 用户输入在模板中的变量名
     history_messages_key="chat_history" # 历史消息在模板中的变量名
 )
@@ -211,7 +207,7 @@ if __name__ == '__main__':
     # 示例 1：第一次对话，建立上下文
     print("\n【第一次对话】")
     res = conversation_chain.invoke(
-        {"input": "小明有2个猫"},
+        {"input": "小明有22个猫"},
         session_config
     )
     print("AI 回复:", res)
@@ -219,7 +215,7 @@ if __name__ == '__main__':
     # 示例 2：第二次对话，继续上下文
     print("\n【第二次对话】")
     res = conversation_chain.invoke(
-        {"input": "小刚有1只狗"},
+        {"input": "小刚有11只狗"},
         session_config
     )
     print("AI 回复:", res)

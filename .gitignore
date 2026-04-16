@@ -4,7 +4,7 @@ __pycache__/
 *$py.class
 *.xlsx
 # C extensions
-
+chat_history
 # Office temporary files
 ~$*
 *.tmp
